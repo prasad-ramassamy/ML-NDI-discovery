@@ -11,7 +11,10 @@ namespace NdiMl
     {
         [ObservableProperty]
         private ObservableCollection<NdiSource> _sources = new();
-        private bool _started;
+
+        [ObservableProperty]
+        [NotifyCanExecuteChangedFor(nameof(StopCommand))]
+        private bool _canStop;
 
         [ObservableProperty]
         private string sourcesCount = "4";
@@ -32,7 +35,7 @@ namespace NdiMl
                 return;
             }
 
-
+            CanStop = false;
             await Stop();
 
             for (int i = 1; i <= nbSources; i++)
@@ -59,10 +62,10 @@ namespace NdiMl
                     await source.InitSource();
                 }
             }
-            _started = true;
+            CanStop = true;
         }
 
-        [RelayCommand]
+        [RelayCommand(AllowConcurrentExecutions = false, CanExecute = nameof(CanStop))]
         public async Task Stop()
         {
             await Parallel.ForEachAsync(Sources, async (s, token) =>
@@ -71,7 +74,7 @@ namespace NdiMl
             });
 
             Sources.Clear();
-            _started = false;
+            CanStop = false;
         }
     }
 }
