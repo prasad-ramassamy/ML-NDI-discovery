@@ -9,11 +9,59 @@ namespace NdiMl
 {
     public partial class MainViewModel : ObservableObject
     {
+        private NdiSource _ndiFinder;
+
+        public MainViewModel()
+        {
+            _ndiFinder = new(0);
+
+            _ndiFinder.InitSource(null);
+
+            _ndiFinder.Sources.CollectionChanged += Sources_CollectionChanged;
+
+        }
+
+        private void Sources_CollectionChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+        {
+            //if (e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Reset)
+            //    AvailableSources.Clear();
+
+            if (e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Add && e.NewItems != null)
+            {
+                foreach (var newItem in e.NewItems)
+                {
+                    var newItemString = newItem.ToString();
+                    if (newItemString != null && !AvailableSources.Contains(newItemString))
+                        AvailableSources.Add(newItemString);
+                }
+
+            }
+
+            if (e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Remove && e.OldItems != null)
+            {
+                foreach (var oldItem in e.OldItems)
+                {
+                    if (oldItem != null)
+                        AvailableSources.Remove(oldItem.ToString() ?? "");
+                }
+
+            }
+        }
+
+
+        [ObservableProperty]
+        private ObservableCollection<string> _availableSources = new ObservableCollection<string>();
+
+        [ObservableProperty]
+        private string? _selectedLine;
+
+
         [ObservableProperty]
         private ObservableCollection<NdiSource> _sources = new();
 
         [ObservableProperty]
         [NotifyCanExecuteChangedFor(nameof(StopCommand))]
+        [NotifyCanExecuteChangedFor(nameof(SetLineCommand))]
         private bool _canStop;
 
         [ObservableProperty]
@@ -21,6 +69,9 @@ namespace NdiMl
 
         [ObservableProperty]
         private bool _parallelStart = true;
+
+        [ObservableProperty]
+        private bool _connectAtStart = true;
 
 
         [RelayCommand(AllowConcurrentExecutions = false)]
@@ -52,14 +103,14 @@ namespace NdiMl
 
                 await Parallel.ForEachAsync(Sources, parallelOptions, async (source, cancelStart) =>
                 {
-                    await source.InitSource();
+                    await source.InitSource(ConnectAtStart ? SelectedLine : null);
                 });
             }
             else
             {
                 foreach (NdiSource source in Sources)
                 {
-                    await source.InitSource();
+                    await source.InitSource(ConnectAtStart ? SelectedLine : null);
                 }
             }
             CanStop = true;
@@ -75,6 +126,17 @@ namespace NdiMl
 
             Sources.Clear();
             CanStop = false;
+        }
+
+        [RelayCommand(CanExecute = nameof(CanStop))]
+        private void SetLine()
+        {
+            if (!CanStop) return;
+
+            if (SelectedLine == null) return;
+
+            foreach (var s in Sources)
+                s.SetLine(SelectedLine);
         }
     }
 }

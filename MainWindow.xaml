@@ -18,7 +18,12 @@
 
             <Button Content="Start" Margin="10" Command="{Binding StartCommand}"/>
             <CheckBox Content="Parallel" Margin="10" IsChecked="{Binding ParallelStart}" />
+            <CheckBox Content="Connect at start" Margin="10" IsChecked="{Binding ConnectAtStart}" />
             <Button Content="Stop" Margin="10" Command="{Binding StopCommand}"/>
+
+            <ComboBox ItemsSource="{Binding AvailableSources}" SelectedItem="{Binding SelectedLine}" Margin="30,10" />
+
+            <Button Content="Connect" Command="{Binding SetLineCommand}" Margin="0,10"/>
         </StackPanel>
 
         <ItemsControl Grid.Row="1" ItemsSource="{Binding Sources}">
@@ -34,6 +39,7 @@
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto" />
                                 <RowDefinition Height="*"/>
                             </Grid.RowDefinitions>
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
@@ -46,7 +52,8 @@
                                 <TextBlock Text="{Binding SourcesFoundCount}" Margin="0,5,5,5" Foreground="Blue" FontWeight="SemiBold"/>
                             </StackPanel>
 
-                            <ItemsControl Grid.Row="2" ItemsSource="{Binding SourcesView}">
+                            <local:WPFPreview Grid.Row="2" Source="{Binding Source}" Width="320"/>
+                            <ItemsControl Grid.Row="3" ItemsSource="{Binding SourcesView}">
 
                             </ItemsControl>
 

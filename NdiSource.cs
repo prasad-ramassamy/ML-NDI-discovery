@@ -1,6 +1,7 @@
 ﻿using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
@@ -13,6 +14,7 @@ namespace NdiMl
 {
     public partial class NdiSource : ObservableObject
     {
+        [ObservableProperty]
         private MLiveClass? _source;
         private Thread? _ndiFinderThread;
 
@@ -38,13 +40,28 @@ namespace NdiMl
             _sourcesView.SortDescriptions.Add(new SortDescription());
         }
 
-        public Task InitSource()
+
+        public void SetLine(string lineName)
         {
+            if (Source == null) { return; }
+
+            Source.PropsSet("device::line-in", lineName);
+            Source.ObjectStart(null);
+        }
+
+        public Task InitSource(string? lineName)
+        {
+            Source = new MLiveClass();
+            //Source.PropsSet("object::external_process", "false");
             return Task.Run(() =>
             {
-                _source = new MLiveClass();
-                _source.DeviceSet("video", "NDI Receiver", "");
-                _source.ObjectStart(null);
+
+                Source.DeviceSet("video", "NDI Receiver", "ndi_auto_connect=false ndi_close_async=true");
+                if (!string.IsNullOrEmpty(lineName))
+                {
+                    SetLine(lineName);
+                }
+
 
 
                 var sb = new StringBuilder();
@@ -53,29 +70,31 @@ namespace NdiMl
                 {
                     while (runThread)
                     {
-                        _source.PropsGet("device::stat::ndi_find_src", out var srcCount);
+                        Source.PropsGet("device::stat::ndi_find_src", out var srcCount);
 
                         if (int.TryParse(srcCount, out var sourcesFoundCount))
                             SourcesFoundCount = sourcesFoundCount;
 
-                        _source.PropsGet("device::line-in-split", out var lineSplit);
+                        Source.PropsGet("device::line-in-split", out var lineSplit);
                         if (lineSplit != null)
                         {
-                            App.Current.Dispatcher.BeginInvoke(() =>
-                            {
-                                Sources.Clear();
-                            });
+
 
                             sb.Clear();
                             sb.AppendLine($"{SourceId} => {srcCount}");
                             var lines = lineSplit.Split('|');
-                            foreach (var line in lines)
+
+                            var toRemove = Sources.Except(lines).ToList();
+                            var toAdd = lines.Except(Sources).ToList();
+                            if (App.Current == null)
+                                break;
+                            App.Current.Dispatcher.BeginInvoke(() =>
                             {
-                                App.Current.Dispatcher.BeginInvoke(() =>
-                                {
-                                    Sources.Add(line);
-                                });
-                            }
+                                foreach (var lineToRemove in toRemove)
+                                    Sources.Remove(lineToRemove);
+                                foreach (var lineToAdd in toAdd)
+                                    Sources.Add(lineToAdd);
+                            });
 
                             Debug.WriteLine(sb.ToString());
                         }
@@ -95,8 +114,9 @@ namespace NdiMl
                 runThread = false;
                 _ndiFinderThread?.Join();
 
-                if (_source != null)
-                    Marshal.ReleaseComObject(_source);
+                Source?.ObjectClose();
+                if (Source != null)
+                    Marshal.ReleaseComObject(Source);
             });
         }
 
